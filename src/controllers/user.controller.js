@@ -113,4 +113,26 @@ const logout = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, {}, "Logged out successfully"))
 })
 
-export { register, login, logout }
+const updateProfile = asyncHandler(async (req, res) => {
+    const { email, phone } = req.body
+
+    if ([email, phone].some((value) => !value)) {
+        throw new ApiError(400, "All fields are required")
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+        { _id: req.user._id },
+        { email, phone },
+        { new: true, select: "-password -refreshToken" }
+    )
+
+    if (!updatedUser) {
+        throw new ApiError(500, "Something went wrong while updating profile")
+    }
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, updatedUser, "Profile updated successfully"))
+})
+
+export { register, login, logout, updateProfile }
