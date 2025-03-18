@@ -2,6 +2,7 @@ import asyncHandler from "../utils/asyncHandler.js"
 import ApiResponse from "../utils/ApiResponse.js"
 import ApiError from "../utils/ApiError.js"
 import { User } from "../models/user.model.js"
+import jwt from "jsonwebtoken"
 
 const options = {
     httpOnly: true,
@@ -26,9 +27,9 @@ const generateAccessAndRefereshTokens = async (userId) => {
 }
 
 const register = asyncHandler(async (req, res) => {
-    const { email, phone, password, confirmPassword } = req.body
+    const { firstName, lastName, email, phone, password, confirmPassword } = req.body
 
-    if ([email, phone, password, confirmPassword].some((value) => !value)) {
+    if ([firstName, lastName, email, phone, password, confirmPassword].some((value) => !value)) {
         throw new ApiError(400, "All fields are required")
     }
 
@@ -43,6 +44,8 @@ const register = asyncHandler(async (req, res) => {
     }
 
     const user = await User.create({
+        firstName,
+        lastName,
         email,
         phone,
         password
@@ -78,6 +81,8 @@ const login = asyncHandler(async (req, res) => {
 
     const loggedInUser = {
         _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
         phone: user.phone,
         role: user.role
@@ -114,15 +119,20 @@ const logout = asyncHandler(async (req, res) => {
 })
 
 const updateProfile = asyncHandler(async (req, res) => {
-    const { email, phone } = req.body
+    const { firstName, lastName, email, phone } = req.body
 
-    if ([email, phone].some((value) => !value)) {
+    if ([firstName, lastName, email, phone].some((value) => !value)) {
         throw new ApiError(400, "All fields are required")
     }
 
     const updatedUser = await User.findOneAndUpdate(
         { _id: req.user._id },
-        { email, phone },
+        {
+            firstName,
+            lastName,
+            email,
+            phone
+        },
         { new: true, select: "-password -refreshToken" }
     )
 
@@ -135,4 +145,46 @@ const updateProfile = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, updatedUser, "Profile updated successfully"))
 })
 
-export { register, login, logout, updateProfile }
+const recreateAccessToken = asyncHandler(async (req, res) => {
+    const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
+
+    if (!incomingRefreshToken) {
+        throw new ApiError(401, "unauthorized request")
+    }
+
+    try {
+        const decodedToken = jwt.verify(
+            incomingRefreshToken,
+            process.env.REFRESH_TOKEN_SECRET
+        )
+
+        const user = await User.findById(decodedToken?._id)
+
+        if (!user) {
+            throw new ApiError(401, "Invalid refresh token")
+        }
+
+        if (incomingRefreshToken !== user?.refreshToken) {
+            throw new ApiError(401, "Refresh token is expired or used")
+
+        }
+
+        const { accessToken, newRefreshToken } = await generateAccessAndRefereshTokens(user._id)
+
+        return res
+            .status(200)
+            .cookie("accessToken", accessToken, options)
+            .cookie("refreshToken", newRefreshToken, options)
+            .json({
+                status: 200,
+                success: true,
+                accessToken,
+                refreshToken: newRefreshToken,
+                message: "Recreate access token successfully"
+            })
+    } catch (error) {
+        throw new ApiError(401, error?.message || "Invalid refresh token")
+    }
+})
+
+export { register, login, logout, recreateAccessToken, updateProfile }
