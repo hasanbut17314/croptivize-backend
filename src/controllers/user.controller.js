@@ -187,4 +187,39 @@ const recreateAccessToken = asyncHandler(async (req, res) => {
     }
 })
 
-export { register, login, logout, recreateAccessToken, updateProfile }
+const getUsers = asyncHandler(async (req, res) => {
+
+    const { page = 1, limit = 10 } = req.query
+    const users = await User.find().select("-password -refreshToken").limit(limit).skip((page - 1) * limit)
+
+    if (!users) {
+        throw new ApiError(500, "Something went wrong while retrieving users")
+    }
+    return res
+        .status(200)
+        .json(new ApiResponse(200, users, "Users retrieved successfully"))
+})
+
+const updateUserRole = asyncHandler(async (req, res) => {
+    const { id } = req.params
+    const { role } = req.body
+    if (role !== "admin" && role !== "user") {
+        throw new ApiError(400, "Invalid role")
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+        { _id: id },
+        { role },
+        { new: true, select: "-password -refreshToken" }
+    )
+
+    if (!updatedUser) {
+        throw new ApiError(500, "Something went wrong while updating user role")
+    }
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, updatedUser, "User role updated successfully"))
+})
+
+export { register, login, logout, recreateAccessToken, updateProfile, getUsers, updateUserRole }

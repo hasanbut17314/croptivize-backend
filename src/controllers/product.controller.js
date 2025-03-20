@@ -2,6 +2,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import ApiError from "../utils/ApiError.js";
 import { Product } from "../models/product.model.js";
+import { Order } from "../models/order.model.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 
 export const createProduct = asyncHandler(async (req, res) => {
@@ -146,5 +147,60 @@ export const deleteProduct = asyncHandler(async (req, res) => {
 
     return res.status(200).json(new ApiResponse(200, {}, "Product deleted successfully"));
 });
+
+export const addOrder = asyncHandler(async (req, res) => {
+
+    const { prodId } = req.params;
+    if (!prodId) throw new ApiError(400, "Product ID is required");
+
+    const product = await Product.findById(prodId);
+    if (!product) throw new ApiError(404, "Product not found");
+
+    const order = await Order.create({
+        user: req.user._id,
+        product: product._id
+    });
+
+    if (!order) throw new ApiError(500, "Something went wrong while placing order");
+
+    return res.status(201).json(new ApiResponse(201, order, "Order placed successfully"));
+})
+
+export const getOrders = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 10 } = req.query;
+
+    const options = {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+        sort: { createdAt: -1 },
+        populate: [
+            { path: 'user', select: 'firstName lastName email' },
+            { path: 'product', select: 'name price' },
+        ]
+    };
+
+    const orders = await Order.paginate({}, options);
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200, {
+                orders: orders.docs,
+                pagination: {
+                    totalDocs: orders.totalDocs,
+                    limit: orders.limit,
+                    totalPages: orders.totalPages,
+                    page: orders.page,
+                    hasPrevPage: orders.hasPrevPage,
+                    hasNextPage: orders.hasNextPage,
+                    prevPage: orders.prevPage,
+                    nextPage: orders.nextPage
+                },
+            },
+                "Orders fetched successfully"
+            )
+        );
+})
 
 
