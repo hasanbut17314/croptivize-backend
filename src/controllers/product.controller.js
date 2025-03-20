@@ -5,10 +5,10 @@ import { Product } from "../models/product.model.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 
 export const createProduct = asyncHandler(async (req, res) => {
-    const { name, price, description, rating, category, isFeatured } = req.body;
+    const { name, price, description, rating, category, isFeatured, link } = req.body;
     const createdBy = req.user._id;
 
-    if ([name, price, description, rating, category].some((value) => !value)) {
+    if ([name, price, description, rating, category, link].some((value) => !value)) {
         throw new ApiError(400, "All fields are required");
     }
 
@@ -20,14 +20,14 @@ export const createProduct = asyncHandler(async (req, res) => {
     }
 
     const newProduct = await Product.create({
-        name, price, description, rating, image, category, isFeatured, createdBy
+        name, price, description, rating, image, category, isFeatured, createdBy, link
     });
 
-    return res.status(201).json(new ApiResponse(201, { product: newProduct }, "Product created successfully"));
+    return res.status(201).json(new ApiResponse(201, newProduct, "Product created successfully"));
 });
 
 export const getProducts = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, category, sort, minPrice, maxPrice, minRating, featured } = req.query;
+    const { page = 1, limit = 10, search, category, sort, minPrice, maxPrice, minRating, featured } = req.query;
     const filter = {};
 
     if (category) filter.category = category;
@@ -38,6 +38,13 @@ export const getProducts = asyncHandler(async (req, res) => {
     }
     if (minRating) filter.rating = { $gte: Number(minRating) };
     if (featured === 'true') filter.isFeatured = true;
+
+    if (search) {
+        filter.$or = [
+            { name: { $regex: search, $options: "i" } },
+            { description: { $regex: search, $options: "i" } },
+        ];
+    }
 
     const sortOptions = {
         price_asc: { price: 1 },
@@ -87,7 +94,8 @@ export const updateProduct = asyncHandler(async (req, res) => {
         description,
         rating,
         category,
-        isFeatured
+        isFeatured,
+        link
     } = req.body;
     const product = await Product.findById(id);
 
@@ -114,7 +122,8 @@ export const updateProduct = asyncHandler(async (req, res) => {
             rating,
             image,
             category,
-            isFeatured
+            isFeatured,
+            link
         },
         { new: true }
     );
