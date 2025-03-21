@@ -3,6 +3,11 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
 const userSchema = new Schema({
+    googleId: {
+        type: String,
+        index: true,
+        sparse: true
+    },
     firstName: {
         type: String,
         required: true
@@ -18,7 +23,6 @@ const userSchema = new Schema({
     },
     phone: {
         type: String,
-        required: true,
         unique: true
     },
     password: {

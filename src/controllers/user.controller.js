@@ -3,6 +3,7 @@ import ApiResponse from "../utils/ApiResponse.js"
 import ApiError from "../utils/ApiError.js"
 import { User } from "../models/user.model.js"
 import jwt from "jsonwebtoken"
+import passport from "passport"
 
 const options = {
     httpOnly: true,
@@ -25,6 +26,104 @@ const generateAccessAndRefereshTokens = async (userId) => {
         throw new ApiError(500, "Something went wrong while generating referesh and access token")
     }
 }
+
+const googleAuth = passport.authenticate('google', {
+    scope: ['profile', 'email']
+});
+
+const googleAuthCallback = (req, res, next) => {
+    passport.authenticate('google', { session: false }, async (err, user) => {
+        if (err) {
+            return next(new ApiError(500, err?.message || "Something went wrong"));
+        }
+
+        if (!user) {
+            return next(new ApiError(401, "Authentication failed"));
+        }
+
+        try {
+            const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(user._id);
+
+            const loggedInUser = {
+                _id: user._id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phone: user.phone,
+                role: user.role
+            };
+
+            // Return HTML that auto-closes itself instead of JSON
+            return res
+                .status(200)
+                .cookie("accessToken", accessToken, options)
+                .cookie("refreshToken", refreshToken, options)
+                .send(`
+                    <html>
+                    <body>
+                        <script>
+                            // Send data to parent window
+                            window.opener.postMessage({
+                                user: ${JSON.stringify(loggedInUser)},
+                                accessToken: "${accessToken}",
+                                refreshToken: "${refreshToken}"
+                            }, "*");
+                            
+                            // Auto-close this window
+                            window.close();
+                        </script>
+                    </body>
+                    </html>
+                `);
+        } catch (error) {
+            return next(new ApiError(500, "Something went wrong during login"));
+        }
+    })(req, res, next);
+};
+
+const googleAuthStatus = asyncHandler(async (req, res) => {
+    // Get the access token from cookies
+    const accessToken = req.cookies?.accessToken;
+
+    if (!accessToken) {
+        return res.status(401).json(
+            new ApiResponse(401, {}, "Not authenticated")
+        );
+    }
+
+    try {
+        // Verify the token
+        const decodedToken = jwt.verify(
+            accessToken,
+            process.env.ACCESS_TOKEN_SECRET
+        );
+
+        // Get user from database
+        const user = await User.findById(decodedToken?._id).select("-password -refreshToken");
+
+        if (!user) {
+            return res.status(401).json(
+                new ApiResponse(401, {}, "Invalid token")
+            );
+        }
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                {
+                    user,
+                    accessToken: req.cookies.accessToken,
+                    refreshToken: req.cookies.refreshToken
+                },
+                "Authentication status retrieved successfully"
+            )
+        );
+    } catch (error) {
+        return res.status(401).json(
+            new ApiResponse(401, {}, "Invalid or expired token")
+        );
+    }
+});
 
 const register = asyncHandler(async (req, res) => {
     const { firstName, lastName, email, phone, password, confirmPassword } = req.body
@@ -222,4 +321,15 @@ const updateUserRole = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, updatedUser, "User role updated successfully"))
 })
 
-export { register, login, logout, recreateAccessToken, updateProfile, getUsers, updateUserRole }
+export {
+    register,
+    login,
+    logout,
+    recreateAccessToken,
+    updateProfile,
+    getUsers,
+    updateUserRole,
+    googleAuth,
+    googleAuthCallback,
+    googleAuthStatus
+}
