@@ -34,11 +34,11 @@ const googleAuth = passport.authenticate('google', {
 const googleAuthCallback = (req, res, next) => {
     passport.authenticate('google', { session: false }, async (err, user) => {
         if (err) {
-            return next(new ApiError(500, err?.message || "Something went wrong"));
+            return res.redirect(`${process.env.CLIENT_URL}/login?error=${encodeURIComponent(err.message || "Authentication failed")}`);
         }
 
         if (!user) {
-            return next(new ApiError(401, "Authentication failed"));
+            return res.redirect(`${process.env.CLIENT_URL}/login?error=Authentication failed`);
         }
 
         try {
@@ -53,30 +53,11 @@ const googleAuthCallback = (req, res, next) => {
                 role: user.role
             };
 
-            // Return HTML that auto-closes itself instead of JSON
+            const encodedUser = encodeURIComponent(JSON.stringify(loggedInUser));
             return res
-                .status(200)
-                .cookie("accessToken", accessToken, options)
-                .cookie("refreshToken", refreshToken, options)
-                .send(`
-                    <html>
-                    <body>
-                        <script>
-                            // Send data to parent window
-                            window.opener.postMessage({
-                                user: ${JSON.stringify(loggedInUser)},
-                                accessToken: "${accessToken}",
-                                refreshToken: "${refreshToken}"
-                            }, "*");
-                            
-                            // Auto-close this window
-                            window.close();
-                        </script>
-                    </body>
-                    </html>
-                `);
+                .redirect(`${process.env.CLIENT_URL}/login/success?user=${encodedUser}&accessToken=${accessToken}&refreshToken=${refreshToken}`);
         } catch (error) {
-            return next(new ApiError(500, "Something went wrong during login"));
+            return res.redirect(`${process.env.CLIENT_URL}/login?error=${encodeURIComponent(error.message || "Login failed")}`);
         }
     })(req, res, next);
 };
