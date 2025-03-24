@@ -49,7 +49,7 @@ const googleAuthCallback = (req, res, next) => {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 email: user.email,
-                phone: user.phone,
+                phone: user.phone || "",
                 role: user.role
             };
 
