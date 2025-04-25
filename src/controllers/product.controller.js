@@ -203,4 +203,87 @@ export const getOrders = asyncHandler(async (req, res) => {
         );
 })
 
+export const orderAnalytics = asyncHandler(async (req, res) => {
+
+    const totalProducts = await Product.countDocuments();
+    const totalOrders = await Order.countDocuments();
+
+    const recentOrders = await Order.find({}).sort({ createdAt: -1 }).limit(5).populate([
+        { path: 'user', select: 'firstName lastName email' },
+        { path: 'product', select: 'name price' },
+    ]);
+
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+    const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
+
+    const pipeline = [
+        {
+            $match: {
+                createdAt: {
+                    $gte: startOfYear,
+                    $lte: endOfYear
+                }
+            }
+        },
+        {
+            $lookup: {
+                from: "products",
+                localField: "product",
+                foreignField: "_id",
+                as: "productData"
+            }
+        },
+        {
+            $unwind: "$productData"
+        },
+        {
+            $group: {
+                _id: { month: { $month: "$createdAt" } },
+                count: { $sum: 1 },
+                total: { $sum: "$productData.price" }
+            }
+        },
+        {
+            $sort: { "_id.month": 1 }
+        },
+        {
+            $project: {
+                _id: 0,
+                month: "$_id.month",
+                count: 1,
+                total: 1
+            }
+        }
+    ];
+
+    const monthlySales = await Order.aggregate(pipeline);
+
+    const monthNames = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+
+    const salesData = monthNames.map((name, index) => {
+        const monthData = monthlySales.find(item => item.month === index + 1);
+
+        return {
+            name: name,
+            count: monthData ? monthData.count : 0,
+            total: monthData ? Math.round(monthData.total) : 0
+        };
+    });
+
+    const currentMonth = new Date().getMonth();
+    const filteredSalesData = salesData.slice(0, currentMonth + 1);
+
+    return res.status(200).json(new ApiResponse(200, {
+        totalProducts,
+        totalOrders,
+        recentOrders,
+        salesData: filteredSalesData
+    }, "Order analytics fetched successfully"));
+
+})
+
 

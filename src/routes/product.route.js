@@ -7,6 +7,7 @@ import {
     updateProduct,
     addOrder,
     getOrders,
+    orderAnalytics
 } from "../controllers/product.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -20,5 +21,6 @@ router.put("/updateProduct/:id", verifyJWT, upload.single("image"), updateProduc
 router.delete("/deleteProduct/:id", verifyJWT, deleteProduct);
 router.post("/addOrder/:prodId", verifyJWT, addOrder);
 router.get("/getOrders", verifyJWT, getOrders);
+router.get("/analytics", verifyJWT, orderAnalytics);
 
 export default router;

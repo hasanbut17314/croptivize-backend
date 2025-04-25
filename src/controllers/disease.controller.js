@@ -7,18 +7,16 @@ import axios from "axios";
 export const addDisease = asyncHandler(async (req, res) => {
     const {
         name,
-        risk,
-        percentage
+        risk
     } = req.body
 
-    if (!name || !percentage) {
-        throw new ApiError(400, "Name and percentage are required")
+    if (!name || !risk) {
+        throw new ApiError(400, "Name and risk are required")
     }
 
     const newDisease = await Disease.create({
         name,
         risk,
-        percentage,
         detectBy: req.user._id
     })
 
@@ -64,35 +62,17 @@ export const diseaseAnalytics = asyncHandler(async (_, res) => {
         }
     ]);
 
-    // Main categories: Rust, Blight, Powdery Mildew, Leaf Spot, Other
-    const mainCategories = ["Rust", "Blight", "Powdery Mildew", "Leaf Spot"];
     const result = [];
-    let otherCount = 0;
-    let otherPercentage = 0;
 
-    // Process each disease, grouping minor ones into "Other"
     analytics.forEach(disease => {
-        // Check if it's one of the main categories
-        if (mainCategories.includes(disease.name)) {
-            result.push({
-                name: disease.name,
-                count: disease.count,
-                percentage: disease.percentage
-            });
-        } else {
-            otherCount += disease.count;
-            otherPercentage += disease.percentage;
-        }
-    });
 
-    // Add "Other" category if there are diseases that don't fit main categories
-    if (otherCount > 0) {
+        const { name, count, percentage } = disease;
         result.push({
-            name: "Other",
-            count: otherCount,
-            percentage: parseFloat(otherPercentage.toFixed(1))
+            name,
+            count,
+            percentage: parseFloat(percentage.toFixed(1))
         });
-    }
+    });
 
     if (!result) {
         throw new ApiError(500, "Something went wrong while fetching disease analytics")
@@ -121,4 +101,14 @@ export const predictDisease = asyncHandler(async (req, res) => {
         console.log(error);
         throw new ApiError(500, "Something went wrong while predicting disease", error)
     }
+})
+
+export const getAllDiseases = asyncHandler(async (_, res) => {
+    const diseases = await Disease.find().populate("detectBy", "firstName lastName email").sort({ createdAt: -1 })
+
+    if (!diseases) {
+        throw new ApiError(500, "Something went wrong while fetching diseases")
+    }
+
+    return res.status(200).json(new ApiResponse(200, diseases, "Diseases fetched successfully"))
 })

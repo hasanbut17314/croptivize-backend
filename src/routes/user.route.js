@@ -9,7 +9,8 @@ import {
     updateUserRole,
     googleAuth,
     googleAuthCallback,
-    googleAuthStatus
+    googleAuthStatus,
+    getUserCount
 } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
@@ -25,5 +26,6 @@ router.post("/recreateAccessToken", recreateAccessToken);
 router.put("/updateProfile", verifyJWT, updateProfile);
 router.get("/getUsers", verifyJWT, getUsers);
 router.put("/updateUserRole/:id", verifyJWT, updateUserRole);
+router.get("/count", verifyJWT, getUserCount);
 
 export default router;

@@ -8,9 +8,6 @@ const diseaseSchema = new Schema({
     risk: {
         type: String
     },
-    percentage: {
-        type: Number
-    },
     detectBy: {
         type: Schema.Types.ObjectId,
         ref: "User"
