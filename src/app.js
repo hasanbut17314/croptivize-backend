@@ -21,9 +21,11 @@ setupPassport()
 import userRouter from "./routes/user.route.js";
 import productRouter from "./routes/product.route.js";
 import diseaseRouter from "./routes/disease.route.js";
+import messageRouter from "./routes/message.route.js";
 
 app.use("/api/user", userRouter)
 app.use("/api/product", productRouter)
 app.use("/api/disease", diseaseRouter)
+app.use("/api/message", messageRouter)
 
 export default app
